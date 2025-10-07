@@ -45,6 +45,7 @@ PodName=monitoring-pod
 # Configure the pod to use a specific, predefined Podman network.
 # This assumes you have an 'app-net.network' Quadlet file or a network named 'app-net' exists.
 Network=bfnet
+PodmanArgs=--static-ip 192.168.1.16
 
 # Set a label on the pod itself
 Label=app.env=production
@@ -96,4 +97,51 @@ podman run --pod monitoring-pod -d --name grafana -v grafana_data:/var/lib/grafa
 
 ```bash
 podman run -d --rm --pod monitoring-pod --name sflow-prom sflow/prometheus
+```
+
+## Refactor for Pod Static Address
+
+From a Gemini proposed sample:
+
+```bash
+# Replace:
+# 1. parent=eth0 with your host's interface name.
+# 2. --subnet, --gateway, and --ip-range with values from your network.
+
+sudo podman network create \
+  --driver=macvlan \
+  --subnet=192.168.1.0/24 \
+  --gateway=192.168.1.1 \
+  --ip-range=192.168.1.16/28 \
+  -o parent=eth0 \
+  bfnet
+  ```
+
+There is a suggestion to use a Quadlet ".network" file named bfnet.network
+
+```config
+[Unit]
+Description=Static IP Macvlan Network
+
+[Network]
+Driver=macvlan
+Options=parent=eth0
+Subnet=192.168.1.0/24
+IPRange=192.168.1.16/28
+Gateway=192.168.1.1
+```
+
+#### Prometheus container (Not Working)
+
+```ini
+[Container]
+ContainerName=prometheus
+Image=prom/prometheus
+Pod=monitoring-pod
+Volume=/var/lib/containers/storage/volumes/prometheus-config/:/etc/prometheus:z
+Volume=prometheus.data:/prometheus:z
+Exec=--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --web.enable-remote-write-receiver
+
+[Install]
+WantedBy=multi-user.target
 ```
