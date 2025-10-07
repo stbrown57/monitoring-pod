@@ -32,7 +32,7 @@ Which returned this relevant data:
 
 Quadlet pod file:
 
-```TOML
+```
 [Unit]
 Description=Application Stack Pod Definition
 Wants=network-online.target
