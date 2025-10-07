@@ -1,0 +1,20 @@
+[Unit]
+Description=Monitoring Stack Pod Definition
+Wants=network-online.target
+After=network-online.target
+
+[Pod]
+# The name assigned to the Podman pod
+PodName=monitoring-pod
+
+# Configure the pod to use a specific, predefined Podman network.
+# This assumes you have an 'app-net.network' Quadlet file or a network named 'app-net' exists.
+Network=bfnet
+
+# Set a label on the pod itself
+Label=app.env=production
+
+[Service]
+# Ensures the pod is restarted if the entire system reboots or the pod service fails
+Restart=always
+TimeoutStartSec=90

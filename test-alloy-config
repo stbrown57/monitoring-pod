@@ -1,0 +1,95 @@
+// This block relabels metrics coming from node_exporter to add standard labels
+discovery.relabel "integrations_node_exporter" {
+  targets = prometheus.exporter.unix.integrations_node_exporter.targets
+
+  rule {
+    // Set the instance label to the hostname of the machine
+    target_label = "instance"
+    replacement  = "orbea.6browns.org"
+  }
+  
+  rule {
+        // Set the nodename label to the hostname of the machine for dashboard compatibility
+        target_label = "nodename"
+        replacement  = "orbea.6browns.org"
+  }
+  
+  rule {
+    // Set a standard job name for all node_exporter metrics
+    target_label = "job"
+    replacement = "integrations/node_exporter"
+  }
+}
+
+// Configure the node_exporter integration to collect system metrics
+prometheus.exporter.unix "integrations_node_exporter" {
+  // Disable unnecessary collectors to reduce overhead
+  disable_collectors = ["ipvs", "btrfs", "infiniband", "xfs", "zfs"]
+  enable_collectors = ["meminfo"]
+
+  filesystem {
+    // Exclude filesystem types that aren't relevant for monitoring
+    fs_types_exclude     = "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|tmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
+    // Exclude mount points that aren't relevant for monitoring
+    mount_points_exclude = "^/(dev|proc|run/credentials/.+|sys|var/lib/docker/.+)($|/)"
+    // Timeout for filesystem operations
+    mount_timeout        = "5s"
+  }
+
+  netclass {
+    // Ignore virtual and container network interfaces
+    ignored_devices = "^(veth.*|cali.*|[a-f0-9]{15})$"
+  }
+
+  netdev {
+    // Exclude virtual and container network interfaces from device metrics
+    device_exclude = "^(veth.*|cali.*|[a-f0-9]{15})$"
+  }
+
+
+}
+
+// Define how to scrape metrics from the node_exporter
+prometheus.scrape "integrations_node_exporter" {
+scrape_interval = "15s"
+  // Use the targets with labels from the discovery.relabel component
+  targets    = discovery.relabel.integrations_node_exporter.output
+  // Send the scraped metrics to the relabeling component
+  forward_to = [prometheus.remote_write.local.receiver]
+}
+
+
+// Define where to send the metrics for storage
+prometheus.remote_write "local" {
+  endpoint {
+    // Send metrics to a locally running Prometheus instance
+    url = "http://192.168.1.35:9090/api/v1/write"
+  }
+}
+
+// 1. Define the downstream component (the receiver)
+loki.write "loki_server" {
+  endpoint {
+    url = "http://192.168.1.35:3100/loki/api/v1/push"
+  }
+}
+
+loki.relabel "drop_info" {
+  forward_to = [loki.write.loki_server.receivers]
+
+  rule {
+    action        = "drop"
+    source_labels = ["level"]
+    regex         = "info"
+  }
+}
+
+loki.source.journal "orbea_journal" {
+  forward_to = loki.write.loki_server.receivers
+  path = "/var/log/journal"
+
+  labels = {
+    job = "orbea-systemd-journal",
+    env = "dev",
+  }
+}
