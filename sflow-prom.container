@@ -1,0 +1,4 @@
+[Container]
+ContainerName=sflow-prom
+Image=docker.io/sflow/prometheus
+Pod=monitoring.Pod
