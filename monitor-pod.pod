@@ -5,7 +5,7 @@ After=network-online.target
 
 [Pod]
 # The name assigned to the Podman pod
-PodName=monitoring-pod
+PodName=monitoring
 
 # Configure the pod to use a specific, predefined Podman network.
 # This assumes you have an 'app-net.network' Quadlet file or a network named 'app-net' exists.

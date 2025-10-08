@@ -1,0 +1,11 @@
+[Container]
+ContainerName=loki
+Image=grafana/loki
+Exec=
+Volume=/var/lib/containers/storage/volumes/loki-config:/etc/loki/:z
+Pod=monitoring.pod
+AutoUpdate=registry
+
+[Unit]
+Description=Loki logging service
+Wants=monitoring.pod

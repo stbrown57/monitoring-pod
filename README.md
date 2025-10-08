@@ -8,12 +8,12 @@ Even with the proper configuration of the journal scrape, I may want to use rsys
 
 The test configuration [test-alloy-config](/test-alloy-config) worked.
 
-## Pod "monitoring-pod"
+## Pod "monitoring"
 
 The monitoring-pod was inspected to retrieve the commands used to create it. 
 
 ```bash
-podman pod inspect monitoring-pod
+podman pod inspect monitoring
 ```
 
 Which returned this relevant data:
@@ -40,12 +40,12 @@ After=network-online.target
 
 [Pod]
 # The name assigned to the Podman pod
-PodName=monitoring-pod
+PodName=monitoring
 
 # Configure the pod to use a specific, predefined Podman network.
 # This assumes you have an 'app-net.network' Quadlet file or a network named 'app-net' exists.
 Network=bfnet
-PodmanArgs=--static-ip 192.168.1.16
+PodmanArgs=--ip 192.168.1.16
 
 # Set a label on the pod itself
 Label=app.env=production
@@ -61,7 +61,7 @@ This started the pod, but when I stop the pod all containers were removed. Here 
 ### Prometheus
 
 ```bash
-podman run --pod monitoring-pod -d \
+podman run --pod monitoring -d \
 -v /var/lib/containers/storage/volumes/prometheus-config/_data/prometheus.yml:/etc/prometheus/prometheus.yml:z \
 -v prometheus.data:/prometheus:z \
 --name prometheus \
@@ -71,7 +71,7 @@ prom/prometheus "--config.file=/etc/prometheus/prometheus.yml" "--storage.tsdb.p
 ### Loki
 
 ```bash
-podman run --pod monitoring-pod -d \
+podman run --pod monitoring -d \
 -v /var/lib/containers/storage/volumes/loki-config/_data/loki-config.yml:/etc/loki/config.yml:z \
 --name loki \
 grafana/loki
@@ -80,23 +80,23 @@ grafana/loki
 ### Alloy
 
 ```bash
-podman run --pod monitoring-pod \
+podman run --pod monitoring \
 -v alloy.conf:/etc/alloy:z  \
 -v alloy.data:/var/lib/alloy/data:z \
 --name alloy \
-docker.io/grafana/alloy:latest run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.all
+docker.io/grafana/alloy:latest run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
 ```
 
 ### Grafana
 
 ```bash
-podman run --pod monitoring-pod -d --name grafana -v grafana_data:/var/lib/grafana:z docker.io/grafana/grafana
+podman run --pod monitoring -d --name grafana -v grafana_data:/var/lib/grafana:z docker.io/grafana/grafana
 ```
 
 ### sFlow-RT
 
 ```bash
-podman run -d --rm --pod monitoring-pod --name sflow-prom sflow/prometheus
+podman run -d --rm --pod monitoring --name sflow-prom sflow/prometheus
 ```
 
 ## Refactor for Pod Static Address
@@ -113,7 +113,7 @@ sudo podman network create \
   --subnet=192.168.1.0/24 \
   --gateway=192.168.1.1 \
   --ip-range=192.168.1.16/28 \
-  -o parent=eth0 \
+  -o parent=enp0s31f6 \
   bfnet
   ```
 
@@ -140,8 +140,24 @@ Image=prom/prometheus
 Pod=monitoring-pod
 Volume=/var/lib/containers/storage/volumes/prometheus-config/:/etc/prometheus:z
 Volume=prometheus.data:/prometheus:z
-Exec=--config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --web.enable-remote-write-receiver
+Exec=run --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --web.enable-remote-write-receiver
 
 [Install]
 WantedBy=multi-user.target
+```
+
+#### Loki
+
+The Quadlet file for the [loki container](/loki.container) passes the quadlet --dryrun
+
+#### Alloy
+
+Trouble shoot Quadlet file:
+
+```
+root@tarmac:/etc/containers/systemd# QUADLET_UNIT_DIRS=/etc/containers/systemd/test /usr/lib/systemd/system-generators/podman-system-generator --dryrun
+quadlet-generator[29284]: Loading source unit file /etc/containers/systemd/test/alloy.container
+quadlet-generator[29284]: converting "alloy.container": unable to translate dependency for monitoring-pod.pod
+quadlet-generator[29284]: processing encountered some errors
+root@tarmac:/etc/containers/systemd# 
 ```

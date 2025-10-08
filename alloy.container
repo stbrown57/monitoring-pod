@@ -1,0 +1,13 @@
+[Container]
+ContainerName=alloy
+Image=docker.io/grafana/alloy:latest
+# The custom command and arguments go into the 'Exec' line
+Exec=run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.all
+Volume=alloy.conf:/etc/alloy:z
+Volume=alloy.data:/var/lib/alloy/data:z
+Pod=monitoring.pod
+AutoUpdate=registry
+
+[Unit]
+Description=Grafana Alloy (Agent)
+Wants=monitoring.pod
